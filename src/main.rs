@@ -61,13 +61,10 @@ fn most_frequent_pair(bytes: &[u8]) -> Option<Pair> {
 	let count = *counts.get(&k).unwrap_or(&0);
 	counts.insert(k, count + 1);
     }
-    //counts
-    let (pair, count) = counts.iter().max_by(|a, b| a.1.cmp(b.1)).unwrap(); // 🔥
-    if *count > 1 {
-	Some(*pair)
-    } else {
-	None
-    }
+    counts
+	.iter()
+	.max_by(|a, b| a.1.cmp(b.1))
+	.and_then(|(pair, count)| if *count > 1 { Some(*pair) } else { None })
 }
 
 fn get_unused_byte(used_bytes: &[u8]) -> Option<u8> {
