@@ -1,58 +1,55 @@
 use std::collections::HashMap;
 
 type Pair = (u8, u8);
-type Count = u32;
 
 fn replace(source: &[u8], replacement: Pair, id: u8) -> Vec<u8> {
     let mut buffer = Vec::<u8>::new();
     let mut skip_next = false;
 
     for pair in std::iter::zip(source.iter(), source[1..].iter()) {
-        let temp = (*pair.0, *pair.1); // 🔥 🔥
-        if temp == replacement {
-            buffer.push(id);
-            skip_next = true;
-        } else if skip_next {
-            skip_next = false
-        } else {
-            buffer.push(*pair.0);
-        }
+	if skip_next {
+	    skip_next = false;
+	    continue;
+	}
+	if (*pair.0, *pair.1) == replacement {
+	    buffer.push(id);
+	    skip_next = true;
+	} else {
+	    buffer.push(*pair.0);
+	}
     }
-
     if !skip_next {
-        buffer.push(*source.last().unwrap());
+	buffer.push(*source.last().unwrap());
     }
-
     buffer
 }
 
 fn main() {
-    //print_hello_world();
-
-    let input = "he he llo world AAA"; // include_bytes!("main.rs");
+    let input = "he hello world AAAX";
     let mut bytes: Vec<u8> = input.as_bytes().into();
+    // A list of Replacements and Counts.
+    // Pair = (a,a), Replacement = H
+    let mut table: Vec<(Pair, u8)> = Vec::new(); // Pair, Replacement
 
     while let Some(candidate_pair) = most_frequent_pair(&bytes) {
-        // A list of Replacements and Counts.
-        // Pair = (a,a), Count = 4, Replacement = H
-        let mut table = HashMap::<(Pair, Count), u8>::new(); // Replacement,  Pair, Count
+	if let Some(unused_byte) = get_unused_byte(&bytes) {
+	    println!("Replace {candidate_pair:?} with {unused_byte:?}");
 
-        if let Some(unused_byte) = get_unused_byte(&bytes) {
-            // 🔥
+	    table.push((candidate_pair, unused_byte));
 
-            println!("Replace {candidate_pair:?} with {unused_byte:?}");
-
-            table.insert((candidate_pair, 0), unused_byte);
-
-            println!("BYTES BEFORE {bytes:?}");
-            bytes = replace(&bytes, candidate_pair, unused_byte);
-            println!("BYTES AFTER {bytes:?}");
-        }
+	    println!("BYTES BEFORE {:?}", String::from_utf8(bytes.clone()));
+	    bytes = replace(&bytes, candidate_pair, unused_byte);
+	    println!("BYTES AFTER {:?}", String::from_utf8(bytes.clone()));
+	}
     }
-
-    //
-
-    //get_unused_bytes(vec![]);
+    for row in table {
+	println!(
+	    "{:?} replaces {:?} {:?}",
+	    char::from(row.1),
+	    char::from(row.0 .0),
+	    char::from(row.0 .1)
+	);
+    }
 }
 
 fn most_frequent_pair(bytes: &[u8]) -> Option<Pair> {
@@ -60,19 +57,16 @@ fn most_frequent_pair(bytes: &[u8]) -> Option<Pair> {
 
     // Count pairs
     for pair in std::iter::zip(bytes.iter(), bytes[1..].iter()) {
-        // println!("{pair:?}");
-
-        let k = (*pair.0, *pair.1);
-        let count = *counts.get(&k).unwrap_or(&0);
-        counts.insert(k, count + 1);
+	let k = (*pair.0, *pair.1);
+	let count = *counts.get(&k).unwrap_or(&0);
+	counts.insert(k, count + 1);
     }
     //counts
     let (pair, count) = counts.iter().max_by(|a, b| a.1.cmp(b.1)).unwrap(); // 🔥
-
     if *count > 1 {
-        Some(*pair)
+	Some(*pair)
     } else {
-        None
+	None
     }
 }
 
@@ -80,28 +74,20 @@ fn get_unused_byte(used_bytes: &[u8]) -> Option<u8> {
     // sort and deduplicate gives one of each byte used
 
     let mut used_bytes = used_bytes.to_owned();
-    used_bytes.sort_unstable();
+    used_bytes.sort();
     used_bytes.dedup();
 
     // left join on all bytes
     (65..=91).find(|&x| !used_bytes.contains(&x))
 }
 
-// #[cfg(test)]
-// mod tests {
-//     use super::*;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-//     #[test]
-//     fn test_unused_bytes_bounds() {
-//         let res = get_unused_bytes(vec![]);
-//         assert!(res.contains(&std::u8::MIN));
-//         assert!(res.contains(&std::u8::MAX));
-//     }
-
-//     #[test]
-//     fn test_unused_bytes_empty() {
-//         let res = get_unused_bytes((std::u8::MIN..=std::u8::MAX).collect());
-//         println!("{:?}", res);
-//         assert!(res.is_empty());
-//     }
-// }
+    #[test]
+    fn test_replace() {
+	let res = replace(b"AA", (b'A', b'A'), b'B'); // cooool
+	assert_eq!(res, vec![b'B']);
+    }
+}
