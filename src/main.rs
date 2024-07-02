@@ -1,18 +1,69 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    fmt::{self, Debug},
+};
 
-type Pair = (u8, u8);
+#[derive(Eq, Clone, Copy, Hash, PartialEq)]
+struct Pair(u8, u8);
 
-fn replace(source: &[u8], replacement: Pair, id: u8) -> Vec<u8> {
+type Count = u32;
+
+impl Debug for Pair {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "({}{})", char::from(self.0), char::from(self.1))
+    }
+}
+
+/// Counts of all pairs in bytes
+struct CountsTable(HashMap<Pair, Count>);
+
+impl CountsTable {
+    /// Create a frequency table from input bytes
+    fn new(bytes: &[u8]) -> Self {
+        let mut counts: HashMap<Pair, Count> = HashMap::new();
+
+        // Count pairs
+        for pair in std::iter::zip(bytes.iter(), bytes[1..].iter()) {
+            counts
+                .entry(Pair(*pair.0, *pair.1))
+                .and_modify(|counter| *counter += 1)
+                .or_insert(1);
+        }
+
+        CountsTable(counts)
+    }
+
+    /// Most frequent pair
+    fn top_pair(&self) -> Option<Pair> {
+        self.0
+            .iter()
+            .max_by(|a, b| a.1.cmp(b.1))
+            .and_then(|(pair, count)| if *count > 1 { Some(*pair) } else { None })
+    }
+
+    /// Decrease the count associated with a pair
+    fn decrease(&mut self, pair: &Pair, count: Count) {
+        println!("Decrease {:?} by {}", pair, count);
+        self.0.entry(*pair).and_modify(|counter| *counter -= count);
+    }
+}
+
+/// Replace `replacement` in `source` with `id`
+///
+/// return (new buffer, number of replacements)
+fn replace(source: &[u8], replacement: Pair, id: u8) -> (Vec<u8>, Count) {
     let mut buffer = Vec::<u8>::new();
     let mut skip_next = false;
+    let mut replacements = 0;
 
     for pair in std::iter::zip(source.iter(), source[1..].iter()) {
         if skip_next {
             skip_next = false;
             continue;
         }
-        if (*pair.0, *pair.1) == replacement {
+        if Pair(*pair.0, *pair.1) == replacement {
             buffer.push(id);
+            replacements += 1;
             skip_next = true;
         } else {
             buffer.push(*pair.0);
@@ -21,50 +72,50 @@ fn replace(source: &[u8], replacement: Pair, id: u8) -> Vec<u8> {
     if !skip_next {
         buffer.push(*source.last().unwrap());
     }
-    buffer
+
+    (buffer, replacements)
 }
 
-fn main() {
-    let input = "he hello world AAAX";
+fn compress(input: &str) -> (Vec<u8>, Vec<(Pair, u8)>) {
     let mut bytes: Vec<u8> = input.as_bytes().into();
-    // A list of Replacements and Counts.
-    // Pair = (a,a), Replacement = H
-    let mut table: Vec<(Pair, u8)> = Vec::new(); // Pair, Replacement
+    let mut count;
+    let mut table: Vec<(Pair, u8)> = Vec::new(); // A list of Replacements and Counts.
+    let mut counts = CountsTable::new(&bytes); // Frequency of each pair
 
-    while let Some(candidate_pair) = most_frequent_pair(&bytes) {
+    while let Some(candidate_pair) = counts.top_pair() {
         if let Some(unused_byte) = get_unused_byte(&bytes) {
-            println!("Replace {candidate_pair:?} with {unused_byte:?}");
+            println!("Before step {:?}", std::str::from_utf8(&bytes).unwrap());
+            println!(
+                "Replace '{candidate_pair:?}' -> {:?}",
+                char::from(unused_byte)
+            );
 
             table.push((candidate_pair, unused_byte));
 
-            println!("BYTES BEFORE {:?}", String::from_utf8(bytes.clone()));
-            bytes = replace(&bytes, candidate_pair, unused_byte);
-            println!("BYTES AFTER {:?}", String::from_utf8(bytes.clone()));
+            (bytes, count) = replace(&bytes, candidate_pair, unused_byte);
+
+            counts.decrease(&candidate_pair, count);
+            println!("After step {:?}\n", std::str::from_utf8(&bytes).unwrap());
         }
     }
-    for row in table {
-        println!(
-            "{:?} replaces {:?} {:?}",
-            char::from(row.1),
-            char::from(row.0 .0),
-            char::from(row.0 .1)
-        );
-    }
+
+    (bytes, table)
 }
 
-fn most_frequent_pair(bytes: &[u8]) -> Option<Pair> {
-    let mut counts: HashMap<(u8, u8), u32> = HashMap::new();
+fn main() {
+    let input = "Hel Hello World AAA XYZ"; // include_str!("main.rs");
+    let (output, table) = compress(input);
 
-    // Count pairs
-    for pair in std::iter::zip(bytes.iter(), bytes[1..].iter()) {
-        let k = (*pair.0, *pair.1);
-        let count = *counts.get(&k).unwrap_or(&0);
-        counts.insert(k, count + 1);
+    println!("Output = {:?}", std::str::from_utf8(&output).unwrap());
+    println!(
+        "Compression ratio = {:?}%",
+        100 * output.len() / input.len()
+    );
+    println!("\nReplacement Table: ");
+
+    for (pair, replacement) in table {
+        println!("Replace '{:?}' -> {:?} ", pair, replacement);
     }
-    counts
-        .iter()
-        .max_by(|a, b| a.1.cmp(b.1))
-        .and_then(|(pair, count)| if *count > 1 { Some(*pair) } else { None })
 }
 
 fn get_unused_byte(used_bytes: &[u8]) -> Option<u8> {
@@ -84,7 +135,7 @@ mod tests {
 
     #[test]
     fn test_replace() {
-        let res = replace(b"AA", (b'A', b'A'), b'B'); // cooool
+        let (res, _count) = replace(b"AA", Pair(b'A', b'A'), b'B');
         assert_eq!(res, vec![b'B']);
     }
 }
