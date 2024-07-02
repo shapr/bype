@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 type Pair = (u8, u8);
+type Count = u32;
 
 fn replace(source: &[u8], replacement: Pair, id: u8) -> Vec<u8> {
     let mut buffer = Vec::<u8>::new();
@@ -32,14 +33,17 @@ fn main() {
     let mut bytes: Vec<u8> = input.as_bytes().into();
 
     while let Some(candidate_pair) = most_frequent_pair(&bytes) {
-        let mut table = HashMap::<Pair, u8>::new(); // Pair, Replacement
+        // A list of Replacements and Counts.
+        // Pair = (a,a), Count = 4, Replacement = H
+        let mut table = HashMap::<(Pair, Count), u8>::new(); // Replacement,  Pair, Count
 
         if let Some(unused_byte) = get_unused_byte(&bytes) {
             // 🔥
 
             println!("Replace {candidate_pair:?} with {unused_byte:?}");
 
-            table.insert(candidate_pair, unused_byte);
+            table.insert((candidate_pair, 0), unused_byte);
+
             println!("BYTES BEFORE {bytes:?}");
             bytes = replace(&bytes, candidate_pair, unused_byte);
             println!("BYTES AFTER {bytes:?}");
