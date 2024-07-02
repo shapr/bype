@@ -25,6 +25,10 @@ fn get_unused_bytes(mut used_bytes: Vec<u8>) -> Vec<u8> {
 	all_bytes.push(b);
     }
     all_bytes
+	.iter()
+	.filter(|&x| used_bytes.contains(x))
+	.cloned() // what the heck is this?
+	.collect()
 }
 
 #[cfg(test)]
@@ -36,5 +40,12 @@ mod tests {
 	let res = get_unused_bytes(vec![]);
 	assert!(res.contains(&std::u8::MIN));
 	assert!(res.contains(&std::u8::MAX));
+    }
+
+    #[test]
+    fn test_unused_bytes_empty() {
+	let res = get_unused_bytes((std::u8::MIN..=std::u8::MAX).collect());
+	println!("{:?}", res);
+	assert!(res.is_empty());
     }
 }
